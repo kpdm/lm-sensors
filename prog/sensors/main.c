@@ -214,14 +214,15 @@ static int do_a_set(const sensors_chip_name *name)
 }
 
 /* returns number of chips found */
-static int do_the_real_work(const sensors_chip_name *match, int *err)
+static int do_the_real_work(const sensors_chip_name *match, int *err, const char *json_sep_open, const char *json_sep_closing)
 {
 	const sensors_chip_name *chip;
 	int chip_nr;
 	int cnt = 0;
 
-	if (do_json)
-		printf("{\n");
+	if (do_json) {
+		printf("%s", json_sep_open);
+	}
 	chip_nr = 0;
 	while ((chip = sensors_get_detected_chips(match, &chip_nr))) {
 		if (do_sets) {
@@ -238,8 +239,9 @@ static int do_the_real_work(const sensors_chip_name *match, int *err)
 		}
 		cnt++;
 	}
-	if (do_json)
-		printf("\n}\n");
+	if (do_json) {
+		printf("%s", json_sep_closing);
+	}
 	return cnt;
 }
 
@@ -350,7 +352,7 @@ int main(int argc, char *argv[])
 	if (do_bus_list) {
 		print_bus_list();
 	} else if (optind == argc) { /* No chip name on command line */
-		if (!do_the_real_work(NULL, &err)) {
+		if (!do_the_real_work(NULL, &err, "{\n", "\n}\n")) {
 			fprintf(stderr,
 				"No sensors found!\n"
 				"Make sure you loaded all the kernel drivers you need.\n"
@@ -360,6 +362,8 @@ int main(int argc, char *argv[])
 			}
 		}
 	} else {
+		const char *json_sep_open = "{\n";
+		int cnt_chips_requested = argc - optind;
 		int cnt = 0;
 		sensors_chip_name chip;
 
@@ -372,14 +376,21 @@ int main(int argc, char *argv[])
 				err = 1;
 				goto exit;
 			}
-			cnt += do_the_real_work(&chip, &err);
+			if (do_json) {
+				if (cnt > 0 && cnt_chips_requested > 1) {
+					json_sep_open = ",\n";
+				}
+			}
+			cnt += do_the_real_work(&chip, &err, json_sep_open, "");
 			sensors_free_chip_name(&chip);
 		}
-
+		if (do_json) {
+			printf("\n}\n");
+		}
 		if (!cnt) {
 			fprintf(stderr, "Specified sensor(s) not found!\n");
 			err = 1;
-		}
+		} 
 	}
 
 exit:
